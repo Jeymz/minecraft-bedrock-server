@@ -1,5 +1,1 @@
-latest.zip
-version.txt
-lib/*
-!lib/world*
-run.sh
+.git/*
