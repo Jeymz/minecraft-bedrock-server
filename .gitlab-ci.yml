@@ -1,0 +1,61 @@
+stages:
+  - build
+  - test
+
+build:container:
+  image: docker:20.10.22-dind
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  services:
+    - name: docker:20.10.22-dind
+      alias: docker
+      command: ["--tls=false"]
+  before_script:
+    - docker info
+  script:
+    - echo -n $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - docker pull $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME || true
+    - docker build -t $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME .
+    - docker push $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME
+
+security:iac:
+  stage: test
+  allow_failure: true
+  image:
+    name: bridgecrew/checkov:latest
+    entrypoint:
+      - '/usr/bin/env'
+      - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+  rules:
+    - if: $SAST_DISABLED
+      when: never
+    - if: $CI_COMMIT_BRANCH
+      exists:
+        - '**/*.yml'
+        - '**/*.yaml'
+        - '**/*.json'
+        - '**/*.template'
+        - '**/*.tf'      
+        - '**/serverless.yml'
+        - '**/serverless.yaml'
+  script:
+    - checkov -d . -o junitxml | tee iac.scan.xml
+  artifacts:
+    reports:
+      junit: "iac.scan.xml"
+    paths:
+      - "iac.scan.xml"
+
+sast:
+  stage: test
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
