@@ -1,8 +1,9 @@
 stages:
-  - build
   - test
+  - build
+  
 
-build:container:
+build:container:gitlab:
   image: docker:20.10.22-dind
   stage: build
   rules:
