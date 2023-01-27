@@ -26,6 +26,29 @@ build:container:gitlab:
     - docker build -t $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME .
     - docker push $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME
 
+build:container:docker:
+  image: docker:20.10.22-dind
+  stage: build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_DRIVER: overlay2
+    DOCKER_TLS_CERTDIR: ""
+  services:
+    - name: docker:20.10.22-dind
+      alias: docker
+      command: ["--tls=false"]
+  before_script:
+    - docker info
+  script:
+    - echo -n $DOCKER_REGISTRY_PASSWORD | docker login -u $DOCKER_REGISTRY_USER --password-stdin
+    - docker pull $DOCKER_ORG/$DOCKER_PROJECT || true
+    - docker build -t $DOCKER_ORG/$DOCKER_PROJECT .
+    - docker push $DOCKER_ORG/$DOCKER_PROJECT
+
 security:iac:
   stage: test
   allow_failure: true
